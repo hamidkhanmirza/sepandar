@@ -1,0 +1,17 @@
+---
+async:
+  host: "tcp://172.16.0.54:61616"
+  username: "root"
+  password: "a@123456A"
+  reconnectTimeout: 60000
+queue:
+  photoTextQueue: "photoQueue"
+  tagTextQueue: "tagQueue"
+  photoBlobQueue: "fileQueue"
+db:
+  url: "jdbc:oracle:thin:@172.16.110.122:1525:pdb_dev_mob"
+  username: msajadi
+  password: msajadi
+fileServer:
+  url: "http://172.16.110.127:8080/fileServer/"
+...

@@ -1,0 +1,12 @@
+---
+async:
+  host: "tcp://172.16.0.54:61616"
+  username: "root"
+  password: "a@123456A"
+queue:
+  photoTextQueue: "photoQueue"
+  tagTextQueue: "tagQueue"
+  photoBlobQueue: "fileQueue"
+fileServer:
+  url: "http://172.16.110.127:8080/fileServer/upload"
+...

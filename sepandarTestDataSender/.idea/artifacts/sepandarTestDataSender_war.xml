@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="sepandarTestDataSender:war">
+    <output-path>$PROJECT_DIR$/target</output-path>
+    <root id="archive" name="SepandarDataSender-0.0.3-SNAPSHOT.war">
+      <element id="artifact" artifact-name="sepandarTestDataSender:war exploded" />
+    </root>
+  </artifact>
+</component>

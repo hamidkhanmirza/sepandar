@@ -1,0 +1,92 @@
+Configutation:
+  name: Default
+
+  Properties:
+    Property:
+      name: log-path
+      value: "logs"
+
+  Appenders:
+
+    Console:
+      name: Console_Appender
+      target: SYSTEM_OUT
+      PatternLayout:
+        pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+
+    RollingFile:
+      - name: Sepandar_PhotoTextMessage_Appender
+        fileName: ${log-path}/sepandar_PhotoTextMessage.log
+        filePattern: "sepandar_PhotoTextMessage.log.%d{yyyy-MM-dd-hh-mm}.log"
+        PatternLayout:
+          pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        Policies:
+          SizeBasedTriggeringPolicy:
+            size: 100 MB
+        DefaultRollOverStrategy:
+          max: 50
+
+      - name: Sepandar_TagTextMessage_Appender
+        fileName: ${log-path}/sepandar_TagTextMessage.log
+        filePattern: "sepandar_TagTextMessage.log.%d{yyyy-MM-dd-hh-mm}.log"
+        PatternLayout:
+          pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        Policies:
+          SizeBasedTriggeringPolicy:
+            size: 100 MB
+        DefaultRollOverStrategy:
+          max: 50
+
+      - name: Sepandar_PhotoBlobMessage_Appender
+        fileName: ${log-path}/sepandar_PhotoBlobMessage.log
+        filePattern: "sepandar_PhotoBlobMessage.log.%d{yyyy-MM-dd-hh-mm}.log"
+        PatternLayout:
+          pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        Policies:
+          SizeBasedTriggeringPolicy:
+            size: 100 MB
+        DefaultRollOverStrategy:
+          max: 50
+
+      - name: Sepandar_App_Appender
+        fileName: ${log-path}/sepandar_app.log
+        filePattern: "sepandar_app.log.%d{yyyy-MM-dd-hh-mm}.log"
+        PatternLayout:
+          pattern: "[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n"
+        Policies:
+          SizeBasedTriggeringPolicy:
+            size: 100 MB
+        DefaultRollOverStrategy:
+          max: 50
+
+    Routing:
+      name: ROUTING_APPENDER
+      Routes:
+        pattern: "$${marker:}"
+        Route:
+          - key: PHOTOTEXT
+            ref: Sepandar_PhotoTextMessage_Appender
+          - key: TAGTEXT
+            ref: Sepandar_TagTextMessage_Appender
+          - key: PHOTOBLOB
+            ref: Sepandar_PhotoBlobMessage_Appender
+
+  Loggers:
+
+      Root:
+        level: debug
+        AppenderRef:
+          - ref: Console_Appender
+
+      Logger:
+        - name: messageLogger
+          level: info
+          AppenderRef:
+            - ref: ROUTING_APPENDER
+              level: info
+
+        - name: appLogger
+          level: info
+          AppenderRef:
+            - ref: Sepandar_App_Appender
+              level: info
