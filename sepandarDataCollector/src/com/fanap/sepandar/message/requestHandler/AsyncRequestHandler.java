@@ -4,10 +4,7 @@ import com.fanap.sepandar.config.ConfigUtil;
 import com.fanap.sepandar.message.messageParsers.PhotoBlobItemParser;
 import com.fanap.sepandar.message.messageParsers.PhotoTextItemParser;
 import com.fanap.sepandar.message.messageParsers.TagTextItemParser;
-import com.fanap.sepandar.persistence.DaoService;
-import com.fanap.sepandar.persistence.PhotoBlobDataService;
-import com.fanap.sepandar.persistence.PhotoTextDataService;
-import com.fanap.sepandar.persistence.TextTagDataService;
+import com.fanap.sepandar.persistence.*;
 import com.fanap.sepandar.sharedEntities.PhotoBlobMessage;
 import com.fanap.sepandar.sharedEntities.PhotoTextMessage;
 import com.fanap.sepandar.sharedEntities.TagTextMessage;
@@ -32,17 +29,9 @@ public class AsyncRequestHandler implements IRequestHandler {
     public final static Logger logger = LogManager.getLogger();
     public final static Logger messageLogger = LogManager.getLogger("messageLogger");
 
-    private Connection connection;
-
-    private Session session;
-
     private Destination photoTextInputQueue;
     private Destination tagTextInputQueue;
     private Destination photoBlobQueue;
-
-    private MessageConsumer photoTextInput_consumer;
-    private MessageConsumer tagTextInput_consumer;
-    private MessageConsumer photoBlob_consumer;
 
     ConnectionFactory factory;
 
@@ -68,195 +57,255 @@ public class AsyncRequestHandler implements IRequestHandler {
                         .append("&jms.prefetchPolicy.all=50")
                         .toString());
 
-        if (factory != null) {
-            connect();
+
+        if(factory != null) {
+            for(int i = 0; i < 2; i++) {
+                new Thread(new ConsumerRunnable()).start();
+            }
         } else {
             throw new IOException("An error occured connecting to ");
         }
-
     }
 
-    private void connect() throws JMSException {
-        try {
-            logger.warn("connecting");
-            close();
-            connection = factory.createConnection(
-                    ConfigUtil.getConfig().getAsync().getUsername(),
-                    ConfigUtil.getConfig().getAsync().getPassword());
+    public class ConsumerRunnable implements java.lang.Runnable {
+        private MessageConsumer photoTextInput_consumer;
+        private MessageConsumer tagTextInput_consumer;
+        private MessageConsumer photoBlob_consumer;
 
-            connection.setExceptionListener(exception -> {
-                close();
-                logger.warn("JMSException occured", exception);
-                try {
-                    Thread.sleep(ConfigUtil.getConfig().getAsync().getReconnectTimeout());
-                    connect();
-                } catch (JMSException e) {
-                    logger.warn("An exception occured ", e);
-                } catch (InterruptedException e) {
-                    logger.warn("Interrupted Exception occured ", e);
-                }
-            });
+        private Connection connection;
+        private Session session;
 
-            connection.start();
-
-            session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-
-            photoTextInput_consumer = session.createConsumer(photoTextInputQueue);
-            tagTextInput_consumer = session.createConsumer(tagTextInputQueue);
-            photoBlob_consumer = session.createConsumer(photoBlobQueue);
-
-            photoTextInput_consumer.setMessageListener(message -> {
-                org.hibernate.Session session1 = DaoService.Instance.getCurrentSession();
-                Transaction tx = null;
-                try {
-                    String messageContent = getMessage(message);
-
-                    Marker PHOTOTEXT_MARKER = MarkerManager.getMarker("PHOTOTEXT");
-                    messageLogger.info(PHOTOTEXT_MARKER, messageContent);
-
-                    List<PhotoTextMessage> photoTextMessageList = (List<PhotoTextMessage>) new PhotoTextItemParser().parseMessage(messageContent);
-
-                    tx = session1.beginTransaction();
-
-                    for (int i = 0; i < photoTextMessageList.size(); i++) {
-                        PhotoTextDataService.INSTANCE.saveOrUpdate(photoTextMessageList.get(i), session1);
-                    }
-
-                    tx.commit();
-                } catch (Exception ex) {
-                    logger.error("Error occured processing photoTextMessage: ", ex);
-                    if (tx != null) {
-                        tx.rollback();
-                    }
-                } finally {
-                    session1.close();
-                }
-            });
-
-            tagTextInput_consumer.setMessageListener(message -> {
-                org.hibernate.Session session1 = DaoService.Instance.getCurrentSession();
-                Transaction tx = null;
-                try {
-                    String messageContent = getMessage(message);
-
-                    Marker TAGTEXT_MARKER = MarkerManager.getMarker("TAGTEXT");
-                    messageLogger.info(TAGTEXT_MARKER, messageContent);
-
-                    List<TagTextMessage> tagTextMessageList = (List<TagTextMessage>) new TagTextItemParser().parseMessage(messageContent);
-
-                    tx = session1.beginTransaction();
-
-                    for (int i = 0; i < tagTextMessageList.size(); i++) {
-                        TextTagDataService.INSTANCE.saveOrUpdate(tagTextMessageList.get(i), session1);
-                    }
-
-                    tx.commit();
-
-                } catch (Exception ex) {
-                    logger.error("Error occured processing tagTextMessage: ", ex);
-                    if (tx != null) {
-                        tx.rollback();
-                    }
-                } finally {
-                    session1.close();
-                }
-            });
-
-            photoBlob_consumer.setMessageListener(message -> {
-                org.hibernate.Session session1 = DaoService.Instance.getCurrentSession();
-                Transaction tx = null;
-                try {
-                    String messageContent = getMessage(message);
-
-                    Marker TAGTEXT_MARKER = MarkerManager.getMarker("PHOTOBLOB");
-                    messageLogger.info(TAGTEXT_MARKER, messageContent);
-
-                    List<PhotoBlobMessage> photoBlobMessageList = (List<PhotoBlobMessage>)new PhotoBlobItemParser().parseMessage(messageContent);
-
-                    tx = session1.beginTransaction();
-
-                    for (int i = 0; i < photoBlobMessageList.size(); i++) {
-                        PhotoBlobDataService.INSTANCE.saveOrUpdate(photoBlobMessageList.get(i), session1);
-                    }
-
-                    tx.commit();
-                } catch (Exception ex) {
-                    logger.error("Error occured processing photoBlobMessage: ", ex);
-                    if (tx != null) {
-                        tx.rollback();
-                    }
-                } finally {
-                    session1.close();
-                }
-            });
-
-            logger.info("connection established");
-        } catch (Exception e) {
-            logger.warn("reconnecting exception " + e.toString() + e);
+        private void connect() throws JMSException {
             try {
-                Thread.sleep(60000);
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
+                logger.warn("connecting");
+                close();
+                connection = factory.createConnection(
+                        ConfigUtil.getConfig().getAsync().getUsername(),
+                        ConfigUtil.getConfig().getAsync().getPassword());
+
+                connection.setExceptionListener(exception -> {
+                    close();
+                    logger.warn("JMSException occured", exception);
+                    try {
+                        Thread.sleep(ConfigUtil.getConfig().getAsync().getReconnectTimeout());
+                        connect();
+                    } catch (JMSException e) {
+                        logger.warn("An exception occured ", e);
+                    } catch (InterruptedException e) {
+                        logger.warn("Interrupted Exception occured ", e);
+                    }
+                });
+
+                connection.start();
+
+                session = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
+
+                photoTextInput_consumer = session.createConsumer(photoTextInputQueue);
+                tagTextInput_consumer = session.createConsumer(tagTextInputQueue);
+                photoBlob_consumer = session.createConsumer(photoBlobQueue);
+
+                photoTextInput_consumer.setMessageListener(message -> {
+                    org.hibernate.Session session1 = DaoService.Instance.getCurrentSession();
+
+                    Transaction tx = null;
+                    try {
+                        String messageContent = getMessage(message);
+
+                        Marker PHOTOTEXT_MARKER = MarkerManager.getMarker("PHOTOTEXT");
+                        messageLogger.info(PHOTOTEXT_MARKER, messageContent);
+
+                        List<PhotoTextMessage> photoTextMessageList = (List<PhotoTextMessage>) new PhotoTextItemParser().parseMessage(messageContent);
+
+                        tx = session1.beginTransaction();
+
+                        for (int i = 0; i < photoTextMessageList.size(); i++) {
+                            PhotoTextDataService.INSTANCE.saveOrUpdate(photoTextMessageList.get(i), session1);
+                        }
+
+                        tx.commit();
+
+                        message.acknowledge();
+                    } catch (Exception ex) {
+                        logger.error("Error occured processing photoTextMessage: ", ex);
+                        if (tx != null) {
+                            tx.rollback();
+                        }
+
+//                        try {
+//                            session.rollback();
+//                        } catch (JMSException e) {
+//                            logger.error("Error occured rollingback session: ", e);
+//                        }
+                    } finally {
+                        session1.close();
+                    }
+
+
+                });
+
+                tagTextInput_consumer.setMessageListener(message -> {
+                    org.hibernate.Session session1 = null;
+                    try {
+                        session1 = DaoService.Instance.getCurrentSession();
+                        message.acknowledge();
+                    } catch (SessionFactoryClosedException | JMSException ex) {
+                        logger.error("Error: ", ex);
+                        return;
+                    }
+
+                    Transaction tx = null;
+                    try {
+                        String messageContent = getMessage(message);
+
+                        Marker TAGTEXT_MARKER = MarkerManager.getMarker("TAGTEXT");
+                        messageLogger.info(TAGTEXT_MARKER, messageContent);
+
+                        List<TagTextMessage> tagTextMessageList = (List<TagTextMessage>) new TagTextItemParser().parseMessage(messageContent);
+
+                        tx = session1.beginTransaction();
+
+                        for (int i = 0; i < tagTextMessageList.size(); i++) {
+                            TextTagDataService.INSTANCE.saveOrUpdate(tagTextMessageList.get(i), session1);
+                        }
+
+                        tx.commit();
+
+                        message.acknowledge();
+                    } catch (Exception ex) {
+                        logger.error("Error occured processing tagTextMessage: ", ex);
+                        if (tx != null) {
+                            tx.rollback();
+                        }
+
+//                        try {
+//                            session.rollback();
+//                        } catch (JMSException e) {
+//                            logger.error("Error occured rollingback session: ", e);
+//                        }
+                    } finally {
+                        session1.close();
+                    }
+                });
+
+                photoBlob_consumer.setMessageListener(message -> {
+                    org.hibernate.Session session1 = null;
+                    try {
+                        session1 = DaoService.Instance.getCurrentSession();
+                        message.acknowledge();
+                    } catch (SessionFactoryClosedException | JMSException ex) {
+                        logger.error("Error: ", ex);
+                        return;
+                    }
+
+                    Transaction tx = null;
+                    try {
+                        String messageContent = getMessage(message);
+
+//                    Marker TAGTEXT_MARKER = MarkerManager.getMarker("PHOTOBLOB");
+//                    messageLogger.info(TAGTEXT_MARKER, messageContent);
+
+                        List<PhotoBlobMessage> photoBlobMessageList = (List<PhotoBlobMessage>) new PhotoBlobItemParser().parseMessage(messageContent);
+
+                        tx = session1.beginTransaction();
+
+                        for (int i = 0; i < photoBlobMessageList.size(); i++) {
+                            PhotoBlobDataService.INSTANCE.saveOrUpdate(photoBlobMessageList.get(i), session1);
+                        }
+
+                        tx.commit();
+
+                        message.acknowledge();
+                    } catch (Exception ex) {
+                        logger.error("Error occured processing photoBlobMessage: ", ex);
+                        if (tx != null) {
+                            tx.rollback();
+                        }
+
+//                        try {
+//                            session.rollback();
+//                        } catch (JMSException e) {
+//                            logger.error("Error occured rollingback session: ", e);
+//                        }
+                    } finally {
+                        session1.close();
+                    }
+                });
+
+                logger.info("connection established");
+            } catch (Exception e) {
+                logger.warn("reconnecting exception " + e.toString() + e);
+                try {
+                    Thread.sleep(60000);
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+                close();
             }
-            close();
         }
-    }
 
-    private String getMessage(Message message) throws Exception {
-        if (message instanceof BytesMessage) {
-            BytesMessage bytesMessage = (BytesMessage) message;
-            byte[] buffer = new byte[(int) bytesMessage.getBodyLength()];
-            int readBytes = bytesMessage.readBytes(buffer);
-            if (readBytes != bytesMessage.getBodyLength()) {
-                throw new IOException("Inconsistant message length");
+        private String getMessage(Message message) throws Exception {
+            if (message instanceof BytesMessage) {
+                BytesMessage bytesMessage = (BytesMessage) message;
+                byte[] buffer = new byte[(int) bytesMessage.getBodyLength()];
+                int readBytes = bytesMessage.readBytes(buffer);
+                if (readBytes != bytesMessage.getBodyLength()) {
+                    throw new IOException("Inconsistant message length");
+                }
+                return new String(buffer, "utf-8");
             }
-            return new String(buffer, "utf-8");
+            return null;
         }
-        return null;
+
+        private void close() {
+            try {
+                if (photoTextInput_consumer != null)
+                    photoTextInput_consumer.close();
+            } catch (Exception e) {
+                logger.warn("exception photoTextInput_consumer close  : ", e);
+            }
+
+            try {
+                if (tagTextInput_consumer != null)
+                    tagTextInput_consumer.close();
+            } catch (Exception e) {
+                logger.warn("exception tagTextInput_consumer close  : ", e);
+            }
+
+            try {
+                if (photoBlob_consumer != null)
+                    photoBlob_consumer.close();
+            } catch (Exception e) {
+                logger.warn("exception photoBlob_consumer close  : ", e);
+            }
+
+            try {
+                if (session != null)
+                    session.close();
+            } catch (Exception ex) {
+                logger.warn("exception close session : ", ex);
+            }
+
+            try {
+                if (connection != null)
+                    connection.close();
+            } catch (Exception e) {
+                logger.warn("exception close connection : ", e);
+            }
+        }
+
+
+        @Override
+        public void run() {
+            try {
+                connect();
+            } catch (Exception ex) {
+                logger.error("Error connecting ", ex);
+            }
+        }
     }
 
-    private void close() {
-        try {
-            if (photoTextInput_consumer != null)
-                photoTextInput_consumer.close();
-        } catch (Exception e) {
-            logger.warn("exception photoTextInput_consumer close  : ", e);
-        }
-
-        try {
-            if (tagTextInput_consumer != null)
-                tagTextInput_consumer.close();
-        } catch (Exception e) {
-            logger.warn("exception tagTextInput_consumer close  : ", e);
-        }
-
-        try {
-            if (photoBlob_consumer != null)
-                photoBlob_consumer.close();
-        } catch (Exception e) {
-            logger.warn("exception photoBlob_consumer close  : ", e);
-        }
-
-        try {
-            if (session != null)
-                session.close();
-        } catch (Exception ex) {
-            logger.warn("exception close session : ", ex);
-        }
-
-        try {
-            if(connection != null)
-                connection.close();
-        } catch (Exception e) {
-            logger.warn("exception close connection : ", e);
-        }
-    }
 
     public static void main(String[] args) {
-//        Logger logger = LogManager.getLogger("messageLogger");
-//
-//        Marker PHOTOTEXT_MARKER = MarkerManager.getMarker("TAGTEXT");
-//        logger.info(PHOTOTEXT_MARKER, "wewerwerwrer");
     }
 
 }

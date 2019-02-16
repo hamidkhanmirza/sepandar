@@ -1,6 +1,6 @@
 ---
 async:
-  host: "tcp://172.16.0.54:61616"
+  host: "tcp://172.16.0.53:61616,tcp://172.16.0.54:61616"
   username: "root"
   password: "a@123456A"
 queue:

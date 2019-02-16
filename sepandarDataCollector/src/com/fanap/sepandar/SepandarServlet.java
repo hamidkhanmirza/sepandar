@@ -3,15 +3,12 @@ package com.fanap.sepandar;
 import com.fanap.sepandar.persistence.DaoService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.wicket.request.IRequestHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.support.AnnotationConfigContextLoader;
-import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -40,11 +37,13 @@ public class SepandarServlet extends HttpServlet {
         logger.debug("                               Initializing Sepandar Data Collector                              ");
         logger.debug("*************************************************************************************************");
 
+        DaoService.Instance.init();
+
         DaoService.Instance.createTablesOnDatabaseForFirstTime().thenApply(o -> {
             try {
                 requestHandler.init();
             } catch (Exception ex) {
-                logger.error("Error occured initializing requestHandler ", ex);
+                logger.error("Error occured initializing requestHandler! ", ex);
                 throw new RuntimeException(ex);
             }
         }).exceptionally(ex -> {

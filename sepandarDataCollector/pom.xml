@@ -383,6 +383,13 @@
             <version>1.21</version>
         </dependency>
 
+        <!--&lt;!&ndash; https://mvnrepository.com/artifact/io.jsondb/jsondb-core &ndash;&gt;-->
+        <!--<dependency>-->
+            <!--<groupId>io.jsondb</groupId>-->
+            <!--<artifactId>jsondb-core</artifactId>-->
+            <!--<version>1.0.85</version>-->
+        <!--</dependency>-->
+
     </dependencies>
     <build>
         <sourceDirectory>src</sourceDirectory>

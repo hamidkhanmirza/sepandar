@@ -7,7 +7,6 @@ import org.apache.logging.log4j.Logger;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.jdbc.Work;
 import org.hibernate.tool.hbm2ddl.SchemaUpdate;
 
 import java.sql.*;
@@ -17,7 +16,7 @@ import java.util.Locale;
  * Created by admin123 on 8/13/2016.
  */
 public class DaoService {
-    public final static Logger logger = LogManager.getLogger();
+    public final static Logger logger = LogManager.getLogger("appLogger");
     public final static DaoService Instance = new DaoService();
 
     private static final ThreadLocal<Session> currentSession = new ThreadLocal<Session>();
@@ -25,6 +24,9 @@ public class DaoService {
     private Configuration conf;
 
     private DaoService() {
+    }
+
+    public void init() {
         logger.debug("initializing Dao configuration .... ");
         try {
             conf = new Configuration();
@@ -51,11 +53,16 @@ public class DaoService {
 
     public Session getCurrentSession() {
         Session session = currentSession.get();
-        if (session == null || !session.isOpen()) {
-            session = sessionFactory.openSession();
-            currentSession.set(session);
+        if (!sessionFactory.isClosed()) {
+            if (session == null || !session.isOpen()) {
+                session = sessionFactory.openSession();
+                currentSession.set(session);
+            }
+            return session;
+        } else {
+            init();
+            throw new SessionFactoryClosedException();
         }
-        return session;
     }
 
     public Session getNewSession() {
